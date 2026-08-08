@@ -23,23 +23,18 @@ jobs:
         touch .env
         touch .env.example
 
-    # ২. নিখুঁতভাবে আসল প্যাকেজ নাম খুঁজে নিয়ে google-services.json ওভাররাইট করা
-    - name: Auto Generate google-services.json with Correct Package
+    # ২. সব জায়গায় সরাসরি সঠিক প্যাকেজ নেম দিয়ে google-services.json জেনারেট করা
+    - name: Force Fix google-services.json Package Name
       run: |
-        # প্রজেক্টের আসল প্যাকেজ নাম অটো-ডিটেক্ট করা
-        PKG_NAME=$(grep -oP '(applicationId|namespace)\s*=?\s*["\x27]\K[^"\x27]+' app/build.gradle* 2>/dev/null | head -n 1)
-        if [ -z "$PKG_NAME" ]; then
-          PKG_NAME=$(grep -oP 'package=["\x27]\K[^"\x27]+' app/src/main/AndroidManifest.xml 2>/dev/null | head -n 1)
-        fi
-        if [ -z "$PKG_NAME" ]; then
-          PKG_NAME="com.aistudio.childguardian.cgapp"
-        fi
-        echo "Detected Package Name: $PKG_NAME"
+        PKG_NAME="com.aistudio.childguardian.cgapp"
+        echo "Forcing Package Name to: $PKG_NAME"
 
-        # ফায়ারবেসের জন্য google-services.json ডাইনামিক তৈরি করা
+        # app ফোল্ডার নিশ্চিত করা
         mkdir -p app/
-        cat <<EOF > app/google-services.json
-        {
+        mkdir -p android/app/
+
+        # ভ্যালিড JSON কন্টেন্ট তৈরি
+        JSON_CONTENT='{
           "project_info": {
             "project_number": "123456789012",
             "project_id": "child-guardian-app",
@@ -50,7 +45,7 @@ jobs:
               "client_info": {
                 "mobilesdk_app_id": "1:123456789012:android:1234567890123456",
                 "android_client_info": {
-                  "package_name": "$PKG_NAME"
+                  "package_name": "'"$PKG_NAME"'"
                 }
               },
               "oauth_client": [],
@@ -67,8 +62,12 @@ jobs:
             }
           ],
           "configuration_version": "1"
-        }
-        EOF
+        }'
+
+        # সব সম্ভাব্য জায়গায় ফাইলটি রাইট করা
+        echo "$JSON_CONTENT" > app/google-services.json
+        echo "$JSON_CONTENT" > android/app/google-services.json
+        echo "$JSON_CONTENT" > google-services.json
 
     # ৩. জাভা ভার্সন সেটআপ (Java 21)
     - name: Set up JDK 21
@@ -96,7 +95,7 @@ jobs:
     - name: Build Debug APK
       run: ./gradlew assembleDebug --no-daemon --no-configuration-cache
 
-    # ৭. তৈরি হওয়া APK ফাইলটি আপলোড করা
+    # ৭. তৈরি হওয়া APK ফাইলটি ডাউনলোডের জন্য আপলোড করা
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
